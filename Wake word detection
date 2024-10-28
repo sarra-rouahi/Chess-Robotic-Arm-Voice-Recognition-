@@ -1,0 +1,81 @@
+import pyaudio
+import wave
+import pvporcupine
+import pvrhino
+from gtts import gTTS
+from playsound import playsound
+
+# Initialize Porcupine and Rhino
+porcupine = pvporcupine.create(keywords=["picovoice"])  # Wake word: "picovoice"
+rhino = pvrhino.create(context_path="path/to/chess_context.rhn")  # Rhino context for chess commands
+
+# Text-to-Speech Function
+def text_to_speech(text, filename="response.mp3"):
+    tts = gTTS(text=text, lang='en')
+    tts.save(filename)
+    playsound(filename)
+
+# Audio Recording Function
+def record_audio(filename, duration=5):
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=1024)
+    frames = []
+    print("Recording...")
+
+    for _ in range(0, int(44100 / 1024 * duration)):
+        data = stream.read(1024)
+        frames.append(data)
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    wf = wave.open(filename, 'wb')
+    wf.setnchannels(1)
+    wf.setsampwidth(p.get_sample_size(pyaudio.paInt16))
+    wf.setframerate(44100)
+    wf.writeframes(b''.join(frames))
+    wf.close()
+
+# Wake Word Detection and Command Handling
+def detect_wake_word_and_command():
+    while True:
+        record_audio("command.wav")  # Records the audio command
+
+        # Check for the wake word in the audio file
+        wake_word_detected = porcupine.process("command.wav")
+        if wake_word_detected:
+            print("Wake word detected. Listening for command...")
+            process_chess_command("command.wav")
+        else:
+            print("No wake word detected.")
+
+# Process Chess Commands Using Rhino
+def process_chess_command(filename):
+    is_finalized = False
+    with wave.open(filename, "rb") as audio_file:
+        while not is_finalized:
+            pcm = audio_file.readframes(512)
+            is_finalized = rhino.process(pcm)
+
+            if is_finalized:
+                intent = rhino.get_intent()
+                if intent['is_understood']:
+                    handle_intent(intent['intent'], intent['slots'])
+                else:
+                    text_to_speech("Sorry, I didn't understand. Please repeat.")
+
+# Handle Chess-Specific Intents
+def handle_intent(intent, slots):
+    if intent == "move_piece":
+        piece = slots.get("piece")
+        destination = slots.get("destination")
+
+        if piece and destination:
+            print(f"Move command received: {piece} to {destination}")
+            text_to_speech(f"Moving the {piece} to {destination}.")
+            # Further development needed to integrate with chess board logic
+        else:
+            text_to_speech("Incomplete command. Please specify the piece and destination.")
+    else:
+        text_to_speech("Unrecognized command. Please try again.")
