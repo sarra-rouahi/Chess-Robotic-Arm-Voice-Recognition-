@@ -1,6 +1,8 @@
 import chess
 import random
 import time
+import pyttsx3
+from vosk import Model, KaldiRecognizer
 import json
 import pyaudio
 
@@ -15,6 +17,20 @@ def undo(board):
         print(f"Undoing move: {last_move}")
     else:
         print("No moves to undo.")
+
+# Function to make a move
+def make_move(board, move_notation):
+    try:
+        move = chess.Move.from_uci(move_notation)
+        if move in board.legal_moves:
+            board.push(move)
+            move_log.append(move_notation)
+            print("\nCurrent state of the board:")
+            print(board)
+        else:
+            print("Illegal move. Try again.")
+    except ValueError:
+        print("Invalid move format. Make sure to use a valid UCI format (e.g., e2e4).")
 
 # Trash-talking phrases
 trash_talk_phrases = [
@@ -80,11 +96,39 @@ casual_chit_chat = [
     "Careful now, I’m not programmed to handle heartbreak if I lose!",
 ]
 
+def speak_text_realtime(text):
+    """Read the text out loud in real-time using text-to-speech."""
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 150)
+    engine.setProperty('volume', 1.0)
+    
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[1].id)
+    
+    engine.say(text)
+    engine.runAndWait()
+
 def random_response(phrases):
     """Generate a random response from a list of phrases."""
     return random.choice(phrases)
 
+# Initialize Vosk model
+model = Model(r"C:\Users\ela\Downloads\vosk-model-en-us-0.22\vosk-model-en-us-0.22")
 
+# Initialize PyAudio for voice recognition
+p = pyaudio.PyAudio()
+stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8192)
+stream.start_stream()
+recognizer = KaldiRecognizer(model, 16000)
+
+# Initialize a chessboard
+board = chess.Board()
+print("Initial board:")
+print(board)
+
+print("\nYou can now play chess.")
+print("Enter moves as text (UCI notation, e.g., e2e4).")
+print("Say 'undo' to undo a move or 'stop' to end the game.")
 
 # Main game loop
 while not board.is_game_over():
@@ -140,3 +184,8 @@ while not board.is_game_over():
 # Game over
 print("\nGame over!")
 print("Result:", board.result())
+
+# Close the audio stream and PyAudio
+stream.stop_stream()
+stream.close()
+p.terminate()
