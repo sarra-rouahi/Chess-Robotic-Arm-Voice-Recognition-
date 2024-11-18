@@ -1,9 +1,10 @@
-
 from pvleopard import Leopard  
 from gtts import gTTS         
 from chess import Board       
 import os                     
 import serial                 
+import time
+import re  
 
 
 leopard = Leopard(access_key="YOUR_PICOVOICE_ACCESS_KEY")  
@@ -33,12 +34,17 @@ def parse_command(command):
     try:
         if not command.startswith("move"):
             raise ValueError("Invalid format. Use 'move [piece] to [square]'.")
-        words = command.split()
-        piece, target = words[1], words[3]
-        if len(target) != 2 or target[0] not in "abcdefgh" or target[1] not in "12345678":
-            raise ValueError(f"Invalid square: {target}")
-        print(f"Parsed Command: Move {piece} to {target}")
-        return piece, target
+        
+        
+        match = re.match(r"move (\w+) to ([a-h][1-8])", command)
+        if match:
+            piece = match.group(1).lower()
+            target = match.group(2)
+            print(f"Parsed Command: Move {piece} to {target}")
+            return piece, target
+        else:
+            raise ValueError("Invalid command format.")
+    
     except Exception as e:
         print("Command parsing error:", e)
         return None, None
@@ -49,12 +55,14 @@ def validate_move(piece, target):
     try:
         legal_moves = [str(move) for move in chess_board.legal_moves]
         move_str = f"{piece[0].lower()}{target}"  
+        
+        
         if move_str in legal_moves:
             chess_board.push_san(move_str)
             print("Move is valid!")
             return True
         else:
-            print("Invalid move.")
+            print(f"Invalid move: {move_str}")
             return False
     except Exception as e:
         print("Chess validation error:", e)
@@ -87,17 +95,66 @@ def main():
     while True:
         print("\nWaiting for your command...")
         command = capture_voice()
+        
         if not command:
             text_to_speech("Sorry, I didn't catch that. Try again.")
             continue
+        
         
         piece, target = parse_command(command)
         if not piece or not target:
             text_to_speech("Invalid command format. Please try again.")
             continue
-
+        
+        
         if validate_move(piece, target):
             send_to_hardware(piece, target)
             text_to_speech(f"Moved {piece} to {target}.")
         else:
             text_to_speech("Invalid move. Please try again.")
+
+
+def enhanced_error_handling():
+    """Improves overall error handling by logging all errors."""
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Operation interrupted by the user.")
+        text_to_speech("Operation interrupted.")
+    except Exception as e:
+        print(f"Unexpected error occurred: {e}")
+        text_to_speech("An unexpected error occurred. Please try again.")
+    finally:
+        print("Shutting down system.")
+        ser.close()  
+
+
+def test_system():
+    """Simulate the full system with test commands."""
+    test_commands = [
+        "move knight to e5",      
+        "move queen to d4",       
+        "move king to g1",        
+        "move rook to b3",        
+        "jump knight to f6"       
+    ]
+    
+    for command in test_commands:
+        print(f"Testing command: {command}")
+        piece, target = parse_command(command)
+        if piece and target:
+            if validate_move(piece, target):
+                send_to_hardware(piece, target)
+                text_to_speech(f"Moved {piece} to {target}.")
+            else:
+                text_to_speech(f"Invalid move for {piece} to {target}.")
+        else:
+            text_to_speech("Invalid command format.")
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    enhanced_error_handling()  
+
+    
+    
