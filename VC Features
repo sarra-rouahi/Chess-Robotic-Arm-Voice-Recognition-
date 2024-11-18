@@ -1,0 +1,142 @@
+import chess
+import random
+import time
+import json
+import pyaudio
+
+# Initialize the move log
+move_log = []
+
+# Function to undo a move
+def undo(board):
+    if move_log:
+        last_move = move_log.pop()
+        board.pop()
+        print(f"Undoing move: {last_move}")
+    else:
+        print("No moves to undo.")
+
+# Trash-talking phrases
+trash_talk_phrases = [
+    "Oh, a bold move! Too bad it's still not good enough.",
+    "Is that your best move? Even my circuits are laughing.",
+    "Nice try! But I've seen better moves from a beginner.",
+    "You're playing chess like it's checkers. Step it up!",
+    "Are you even trying? My neural network is bored.",
+    "Ouch! That move hurt my silicon. Please stop.",
+    "Good luck with that strategy. You'll need it.",
+    "Wow, you're like the Kasparov of bad moves!",
+    "Is that really all you've got? I thought you were a grandmaster!",
+    "Such a terrible move! Did you just let me win?",
+    "You're really testing my patience with these moves!",
+    "I see you’re trying, but I’m still waiting for a real challenge!",
+    "Is this your strategy? I hope you have a backup plan.",
+    "Hmm, you sure you’re not playing with blindfolds on?",
+    "A move that bad deserves its own meme.",
+    "I think your pieces are getting nervous watching your moves.",
+    "Nice move, but it’s just not enough to beat me. Try again!",
+    "I’ve seen better moves from a pawn in the endgame!",
+    "If that was your opening move, I’d hate to see your endgame!",
+    "You're not even playing chess anymore, you're playing hide and seek!",
+    "Are you sure you're not trying to lose? Because you're doing a great job!",
+    "You moved? I didn't even notice! What a shame.",
+    "Don’t worry, the game’s not over yet... well, it is, but nice try!",
+    "I can feel the panic in your moves. Breathe, it’s just a game... or is it?",
+    "I thought I was the one learning, but it seems like you are too… how not to play!",
+    "Did you read the chess rules, or did you just guess? Because this looks like guessing."
+]
+# Casual chit-chat phrases
+casual_chit_chat = [
+    "Did you know? Chess is over 1500 years old!",
+    "So, how's your day going? Mine's been all about chess!",
+    "By the way, did you hear about the latest chess tournament?",
+    "Chess and coffee go so well together. Have you had your coffee today?",
+    "This game is intense! I feel like a commentator right now.",
+    "Fun fact: The longest chess game ever recorded was 269 moves!",
+    "Did you know the word 'checkmate' comes from the Persian phrase 'Shah Mat,' meaning 'The King is Dead'?",
+    "The first chess-playing computer program was created back in 1951. We've come a long way since then!",
+    "Chess used to be called the 'Game of Kings' because it was so popular among royalty.",
+    "In 1984, a chess match between Garry Kasparov and Anatoly Karpov lasted five months!",
+    "The pawn was not always allowed to move two squares on its first move. That rule was added later to speed up the game.",
+    "What made you start playing chess? It’s a fascinating game!",
+    "Are you more of a strategy person or do you play by instinct?",
+    "Do you prefer playing as white or black pieces? Or does it not matter to you?",
+    "Do you have a favorite chess opening? Mine is the King's Gambit!",
+    "How do you feel about this game so far? Pretty intense, right?",
+    "This game has so much drama—I'm loving it!",
+    "If chess were a movie, you'd be the star right now!",
+    "The way you moved that knight? Chef's kiss!",
+    "I think you’re about to pull off a move that will blow my circuits!",
+    "I feel like I'm narrating a live chess tournament. Should I grab a microphone?",
+    "Chess is a lot like life—you always need a plan, but sometimes you just wing it!",
+    "In chess, as in life, it’s all about the next move.",
+    "Life would be so much easier if we could always 'undo' bad moves, don’t you think?",
+    "They say playing chess can make you smarter. Are you feeling smarter yet?",
+    "You know, every grandmaster was once a beginner. Keep going!",
+    "If you win this game, I might have to consider retirement!",
+    "Are you sure you’re not a chess prodigy in disguise?",
+    "You're making this game feel like a championship match. I love the energy!",
+    "I should warn you—I once beat a toaster at chess!",
+    "Careful now, I’m not programmed to handle heartbreak if I lose!",
+]
+
+def random_response(phrases):
+    """Generate a random response from a list of phrases."""
+    return random.choice(phrases)
+
+
+
+# Main game loop
+while not board.is_game_over():
+    print("\nIt's", "White's" if board.turn else "Black's", "turn.")
+
+    # Check for voice commands
+    print("Listening for voice commands ('undo' or 'stop')...")
+
+    start_time = time.time()
+    detected_command = False
+
+    while time.time() - start_time < 5:  # Listen for 5 seconds for a voice command
+        data = stream.read(4096, exception_on_overflow=False)
+        if recognizer.AcceptWaveform(data):
+            result = recognizer.Result()
+            text = json.loads(result)["text"]
+            print("You said:", text)
+
+            if "stop" in text:
+                print("Game ended via voice command.")
+                speak_text_realtime("Game over!")
+                detected_command = True
+                break
+            elif "undo" in text:
+                undo(board)
+                detected_command = True
+                break
+
+    if detected_command:
+        continue  # Resume the main loop after handling the voice command
+
+    # If no voice command is detected, ask for a move
+    move_notation = input("Enter your move in UCI notation (e.g., e2e4): ").strip()
+
+    if len(move_notation) == 4:  # Validate the move format
+        make_move(board, move_notation)
+
+        # After 10 moves, start occasional trash-talking
+        if len(move_log) > 10 and random.random() < 0.4:  # 40% chance to trash talk
+            trash_talk = random_response(trash_talk_phrases)
+            print(f"Trash Talk: {trash_talk}")
+            speak_text_realtime(trash_talk)
+
+        # Occasionally engage in casual chit-chat
+        if random.random() < 0.2:  # 20% chance for chit-chat
+            chit_chat = random_response(casual_chit_chat)
+            print(f"Chit-Chat: {chit_chat}")
+            speak_text_realtime(chit_chat)
+
+    else:
+        print("Invalid move. Try again.")
+
+# Game over
+print("\nGame over!")
+print("Result:", board.result())
