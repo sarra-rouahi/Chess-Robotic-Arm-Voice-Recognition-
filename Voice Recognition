@@ -1,0 +1,103 @@
+
+from pvleopard import Leopard  
+from gtts import gTTS         
+from chess import Board       
+import os                     
+import serial                 
+
+
+leopard = Leopard(access_key="YOUR_PICOVOICE_ACCESS_KEY")  
+chess_board = Board()  
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)  
+
+
+def capture_voice():
+    """Record speech and convert to text using Picovoice Leopard."""
+    print("Listening... Speak your command (e.g., 'move knight to e5').")
+    try:
+        from pvrecorder import PvRecorder  
+        recorder = PvRecorder(device_index=-1, frame_length=512)
+        recorder.start()
+        frames = [recorder.read() for _ in range(100)]  
+        recorder.stop()
+        transcript, _ = leopard.process(frames)
+        print("Recognized Command:", transcript)
+        return transcript.lower() if transcript else None
+    except Exception as e:
+        print("Voice input error:", e)
+        return None
+
+
+def parse_command(command):
+    """Parse and validate the chess move command."""
+    try:
+        if not command.startswith("move"):
+            raise ValueError("Invalid format. Use 'move [piece] to [square]'.")
+        words = command.split()
+        piece, target = words[1], words[3]
+        if len(target) != 2 or target[0] not in "abcdefgh" or target[1] not in "12345678":
+            raise ValueError(f"Invalid square: {target}")
+        print(f"Parsed Command: Move {piece} to {target}")
+        return piece, target
+    except Exception as e:
+        print("Command parsing error:", e)
+        return None, None
+
+
+def validate_move(piece, target):
+    """Validate if the move is legal based on chess rules."""
+    try:
+        legal_moves = [str(move) for move in chess_board.legal_moves]
+        move_str = f"{piece[0].lower()}{target}"  
+        if move_str in legal_moves:
+            chess_board.push_san(move_str)
+            print("Move is valid!")
+            return True
+        else:
+            print("Invalid move.")
+            return False
+    except Exception as e:
+        print("Chess validation error:", e)
+        return False
+
+
+def send_to_hardware(piece, target):
+    """Send move command to robotic arm via serial communication."""
+    try:
+        command = f"{piece}:{target}"  
+        ser.write(command.encode())
+        print(f"Command sent to hardware: {command}")
+    except Exception as e:
+        print("Hardware communication error:", e)
+
+
+def text_to_speech(response):
+    """Convert text to speech for feedback."""
+    try:
+        tts = gTTS(response)
+        tts.save("response.mp3")
+        os.system("start response.mp3")  
+        print("Audio feedback played.")
+    except Exception as e:
+        print("TTS error:", e)
+
+
+def main():
+    """Main loop to handle voice commands and execute chess moves."""
+    while True:
+        print("\nWaiting for your command...")
+        command = capture_voice()
+        if not command:
+            text_to_speech("Sorry, I didn't catch that. Try again.")
+            continue
+        
+        piece, target = parse_command(command)
+        if not piece or not target:
+            text_to_speech("Invalid command format. Please try again.")
+            continue
+
+        if validate_move(piece, target):
+            send_to_hardware(piece, target)
+            text_to_speech(f"Moved {piece} to {target}.")
+        else:
+            text_to_speech("Invalid move. Please try again.")
